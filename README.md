@@ -25,12 +25,6 @@ Real-time barometric pressure monitor for Berlin with forecast and historical da
 
 ## Local Development
 
-The Python backend (`main.py`) is still included for local dev but is no longer required:
-
 ```bash
-# Option 1: just open the static files
 cd docs && python -m http.server 8000
-
-# Option 2: run the FastAPI backend (optional)
-uv run uvicorn main:app --host 0.0.0.0 --port 8000
 ```
