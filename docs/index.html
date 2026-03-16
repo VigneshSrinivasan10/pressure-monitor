@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Berlin Pressure Monitor</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Berlin Barometric Pressure</h1>
+
+    <div class="cards">
+      <div class="card current">
+        <div class="label">Now</div>
+        <div class="value" id="current">--</div>
+        <div class="unit">hPa</div>
+      </div>
+      <div class="card forecast">
+        <div class="label">Tomorrow</div>
+        <div class="value" id="tomorrow">--</div>
+        <div class="unit">hPa</div>
+      </div>
+      <div class="card trend">
+        <div class="label">Trend</div>
+        <div class="value" id="trend">--</div>
+      </div>
+    </div>
+
+    <h2>Forecast</h2>
+    <div class="range-buttons" id="forecast-buttons">
+      <button data-hours="24" class="active">1D</button>
+      <button data-hours="72">3D</button>
+      <button data-hours="168">1W</button>
+      <button data-hours="336">2W</button>
+    </div>
+    <canvas id="forecast-chart"></canvas>
+
+    <h2>History</h2>
+    <div class="range-buttons" id="range-buttons">
+      <button data-range="1w" class="active">1W</button>
+      <button data-range="1m">1M</button>
+      <button data-range="3m">3M</button>
+      <button data-range="6m">6M</button>
+      <button data-range="1y">1Y</button>
+    </div>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
