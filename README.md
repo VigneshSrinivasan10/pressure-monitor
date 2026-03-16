@@ -8,7 +8,7 @@ Real-time barometric pressure monitor for Berlin with forecast and historical da
 
 - **Frontend:** Vanilla JS + Chart.js (client-side only)
 - **Data:** [Open-Meteo API](https://open-meteo.com/) called directly from the browser (CORS-friendly)
-- **Hosting:** GitHub Pages (static files in `docs/`)
+- **Hosting:** GitHub Pages
 
 ## Features
 
@@ -26,5 +26,5 @@ Real-time barometric pressure monitor for Berlin with forecast and historical da
 ## Local Development
 
 ```bash
-cd docs && python -m http.server 8000
+npx serve
 ```
