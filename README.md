@@ -13,7 +13,7 @@ Real-time barometric pressure monitor for Berlin with forecast and historical da
 ## Features
 
 - Current pressure + tomorrow's forecast + trend indicator
-- Hourly forecast chart (1D / 3D / 1W / 2W)
+- Hourly forecast chart (Today / 3D / 1W / 2W)
 - Historical chart (1W / 1M / 3M / 6M / 1Y)
 - Installable PWA with offline shell caching
 
