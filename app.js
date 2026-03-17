@@ -57,6 +57,43 @@ async function loadForecast(hours) {
     const labels = sliced.map(r => r.time);
     const values = sliced.map(r => r.pressure_hpa);
 
+    // Find the data point closest to "now"
+    const now = Date.now();
+    let nowIndex = 0;
+    let minDiff = Infinity;
+    sliced.forEach((d, i) => {
+      const diff = Math.abs(new Date(d.time).getTime() - now);
+      if (diff < minDiff) { minDiff = diff; nowIndex = i; }
+    });
+
+    const pointRadii = values.map((_, i) => i === nowIndex ? 5 : 0);
+    const pointColors = values.map((_, i) => i === nowIndex ? "#fff" : "transparent");
+    const pointBorders = values.map((_, i) => i === nowIndex ? "#4fc3f7" : "transparent");
+
+    const nowLinePlugin = {
+      id: "nowLine",
+      afterDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        const pt = meta.data[nowIndex];
+        if (!pt) return;
+        const { ctx, chartArea: { top, bottom } } = chart;
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(pt.x, top);
+        ctx.lineTo(pt.x, bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "bold 11px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Now", pt.x, top - 4);
+        ctx.restore();
+      },
+    };
+
     if (forecastChart) forecastChart.destroy();
     forecastChart = new Chart(document.getElementById("forecast-chart"), {
       type: "line",
@@ -69,12 +106,16 @@ async function loadForecast(hours) {
           backgroundColor: "rgba(79,195,247,0.1)",
           fill: true,
           tension: 0.3,
-          pointRadius: 0,
+          pointRadius: pointRadii,
+          pointBackgroundColor: pointColors,
+          pointBorderColor: pointBorders,
+          pointBorderWidth: 2,
           borderWidth: 1.5,
         }],
       },
       options: {
         responsive: true,
+        layout: { padding: { top: 16 } },
         plugins: { legend: { display: false } },
         scales: {
           x: {
@@ -92,6 +133,7 @@ async function loadForecast(hours) {
           y: { ticks: { color: "#888" } },
         },
       },
+      plugins: [nowLinePlugin],
     });
   } catch {
     console.error("Failed to load forecast");
