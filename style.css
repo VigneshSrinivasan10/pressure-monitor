@@ -90,3 +90,82 @@ h2 {
 }
 
 canvas { width: 100% !important; }
+
+/* Location picker */
+#location-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.location-edit-icon {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #888;
+  transition: color 0.15s;
+}
+
+.location-edit-icon:hover {
+  color: #4fc3f7;
+}
+
+.location-search {
+  position: relative;
+  max-width: 350px;
+  margin: 0 auto 1rem;
+}
+
+.location-search.hidden {
+  display: none;
+}
+
+#location-input {
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 20px;
+  color: #eee;
+  font-size: 0.9rem;
+  outline: none;
+}
+
+#location-input:focus {
+  border-color: #4fc3f7;
+}
+
+#location-results {
+  list-style: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: #16213e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+#location-results:empty {
+  display: none;
+}
+
+#location-results li {
+  padding: 0.5rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #222;
+}
+
+#location-results li:hover {
+  background: #0f3460;
+}
+
+#location-results li small {
+  color: #888;
+  margin-left: 0.3rem;
+}

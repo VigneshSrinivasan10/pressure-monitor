@@ -1,4 +1,4 @@
-const CACHE = "pressure-v8";
+const CACHE = "pressure-v9";
 const SHELL = ["./", "style.css", "app.js", "manifest.json"];
 
 self.addEventListener("install", e => {

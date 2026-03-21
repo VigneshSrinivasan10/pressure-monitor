@@ -1,19 +1,33 @@
-const LAT = 52.52;
-const LON = 13.41;
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive";
+const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const RANGE_DAYS = { "1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365 };
 const TREND_ICONS = { rising: "\u2197\ufe0f Rising", falling: "\u2198\ufe0f Falling", stable: "\u2194\ufe0f Stable" };
+const DEFAULT_LOCATION = { name: "Berlin", lat: 52.52, lon: 13.41 };
 
+let currentLocation = loadLocation();
 let chart;
 let activeRange = "1w";
 let forecastChart;
 let forecastData = [];
 let activeForecastHours = 24;
 
+function loadLocation() {
+  try {
+    const saved = localStorage.getItem("pressure-location");
+    if (saved) return JSON.parse(saved);
+  } catch {}
+  return { ...DEFAULT_LOCATION };
+}
+
+function saveLocation(loc) {
+  currentLocation = loc;
+  localStorage.setItem("pressure-location", JSON.stringify(loc));
+}
+
 async function loadCurrent() {
   try {
-    const url = `${FORECAST_URL}?latitude=${LAT}&longitude=${LON}&current=surface_pressure&daily=surface_pressure_mean&forecast_days=2&timezone=Europe%2FBerlin`;
+    const url = `${FORECAST_URL}?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current=surface_pressure&daily=surface_pressure_mean&forecast_days=2&timezone=auto`;
     const r = await fetch(url);
     const data = await r.json();
 
@@ -44,7 +58,7 @@ async function loadForecast(hours) {
 
   try {
     if (!forecastData.length) {
-      const url = `${FORECAST_URL}?latitude=${LAT}&longitude=${LON}&hourly=surface_pressure&forecast_days=16&timezone=Europe%2FBerlin`;
+      const url = `${FORECAST_URL}?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&hourly=surface_pressure&forecast_days=16&timezone=auto`;
       const r = await fetch(url);
       const data = await r.json();
       const times = data.hourly?.time ?? [];
@@ -155,7 +169,7 @@ async function loadHistory(range) {
     start.setDate(start.getDate() - days);
     const fmt = d => d.toISOString().split("T")[0];
 
-    const url = `${ARCHIVE_URL}?latitude=${LAT}&longitude=${LON}&hourly=surface_pressure&timezone=Europe%2FBerlin&start_date=${fmt(start)}&end_date=${fmt(end)}`;
+    const url = `${ARCHIVE_URL}?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&hourly=surface_pressure&timezone=auto&start_date=${fmt(start)}&end_date=${fmt(end)}`;
     const r = await fetch(url);
     const data = await r.json();
     const times = data.hourly?.time ?? [];
@@ -213,6 +227,81 @@ document.getElementById("range-buttons").addEventListener("click", e => {
   if (e.target.dataset.range) loadHistory(e.target.dataset.range);
 });
 
+function reloadAll() {
+  forecastData = [];
+  document.getElementById("location-name").textContent = currentLocation.name + " Barometric Pressure";
+  document.title = `${currentLocation.name} Pressure Monitor`;
+  loadCurrent();
+  loadForecast();
+  loadHistory();
+}
+
+let searchTimeout = null;
+
+function initLocationUI() {
+  const editBtn = document.getElementById("location-edit-btn");
+  const searchDiv = document.getElementById("location-search");
+  const input = document.getElementById("location-input");
+  const results = document.getElementById("location-results");
+
+  document.getElementById("location-name").textContent = currentLocation.name + " Barometric Pressure";
+  document.title = `${currentLocation.name} Pressure Monitor`;
+
+  editBtn.addEventListener("click", () => {
+    searchDiv.classList.toggle("hidden");
+    if (!searchDiv.classList.contains("hidden")) {
+      input.value = "";
+      input.focus();
+      results.innerHTML = "";
+    }
+  });
+
+  input.addEventListener("input", () => {
+    clearTimeout(searchTimeout);
+    const query = input.value.trim();
+    if (query.length < 2) {
+      results.innerHTML = "";
+      return;
+    }
+    searchTimeout = setTimeout(() => searchCity(query, results), 300);
+  });
+
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") searchDiv.classList.add("hidden");
+  });
+
+  document.addEventListener("click", e => {
+    if (!searchDiv.contains(e.target) && e.target !== editBtn) {
+      searchDiv.classList.add("hidden");
+    }
+  });
+}
+
+async function searchCity(query, resultsEl) {
+  try {
+    const url = `${GEOCODE_URL}?name=${encodeURIComponent(query)}&count=5&language=en`;
+    const r = await fetch(url);
+    const data = await r.json();
+    const items = data.results || [];
+
+    resultsEl.innerHTML = "";
+    items.forEach(item => {
+      const li = document.createElement("li");
+      const secondary = [item.admin1, item.country].filter(Boolean).join(", ");
+      li.innerHTML = `${item.name} <small>${secondary}</small>`;
+      li.addEventListener("click", () => {
+        saveLocation({ name: item.name, lat: item.latitude, lon: item.longitude });
+        document.getElementById("location-search").classList.add("hidden");
+        reloadAll();
+      });
+      resultsEl.appendChild(li);
+    });
+  } catch {
+    console.error("Geocoding search failed");
+  }
+}
+
+initLocationUI();
 loadCurrent();
 loadForecast();
 loadHistory("1w");
