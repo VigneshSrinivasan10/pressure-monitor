@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Berlin Pressure Monitor</title>
+  <title>Pressure Monitor</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1a1a2e">
   <link rel="stylesheet" href="style.css">
@@ -11,7 +11,14 @@
 </head>
 <body>
   <div class="container">
-    <h1>Berlin Barometric Pressure</h1>
+    <h1 id="location-header">
+      <span id="location-name">Barometric Pressure</span>
+      <span class="location-edit-icon" id="location-edit-btn" title="Change location">&#9998;</span>
+    </h1>
+    <div id="location-search" class="location-search hidden">
+      <input type="text" id="location-input" placeholder="Search city..." autocomplete="off">
+      <ul id="location-results"></ul>
+    </div>
 
     <div class="cards">
       <div class="card current">
