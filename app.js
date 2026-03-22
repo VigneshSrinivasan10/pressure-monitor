@@ -229,7 +229,7 @@ document.getElementById("range-buttons").addEventListener("click", e => {
 
 function reloadAll() {
   forecastData = [];
-  document.getElementById("location-name").textContent = currentLocation.name + " Barometric Pressure";
+  document.getElementById("location-name").innerHTML = "Air pressure<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
   loadCurrent();
   loadForecast();
@@ -244,7 +244,7 @@ function initLocationUI() {
   const input = document.getElementById("location-input");
   const results = document.getElementById("location-results");
 
-  document.getElementById("location-name").textContent = currentLocation.name + " Barometric Pressure";
+  document.getElementById("location-name").innerHTML = "Air pressure<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
 
   editBtn.addEventListener("click", () => {
