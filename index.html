@@ -22,11 +22,19 @@
 
     <div class="cards">
       <div class="card current">
-        <div class="label">Now</div>
+        <div class="label">Pressure</div>
         <div class="value" id="current">--</div>
         <div class="unit">hPa</div>
       </div>
-      <div class="card forecast">
+      <div class="card humidity">
+        <div class="label">Humidity</div>
+        <div class="value" id="current-humidity">--</div>
+      </div>
+      <div class="card temperature">
+        <div class="label">Temperature</div>
+        <div class="value" id="current-temp">--</div>
+      </div>
+      <div class="card forecast-card">
         <div class="label">Tomorrow</div>
         <div class="value" id="tomorrow">--</div>
         <div class="unit">hPa</div>
@@ -35,6 +43,12 @@
         <div class="label">Trend</div>
         <div class="value" id="trend">--</div>
       </div>
+    </div>
+
+    <div class="signal-buttons" id="signal-buttons">
+      <button data-signal="pressure" class="active">Pressure</button>
+      <button data-signal="humidity">Humidity</button>
+      <button data-signal="temperature">Temperature</button>
     </div>
 
     <h2>Forecast</h2>

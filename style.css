@@ -57,8 +57,50 @@ h2 {
 }
 
 .current .value { color: #4fc3f7; }
-.forecast .value { color: #81c784; }
+.humidity .value { color: #81c784; }
+.temperature .value { color: #ffb74d; }
+.forecast-card .value { color: #81c784; }
 .trend .value { font-size: 1.3rem; }
+
+/* Signal toggle buttons */
+.signal-buttons {
+  display: flex;
+  gap: 0.4rem;
+  margin: 1.2rem 0 0.4rem;
+}
+
+.signal-buttons button {
+  flex: 1;
+  padding: 0.5rem 0;
+  background: #16213e;
+  color: #aaa;
+  border: 1px solid #333;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.signal-buttons button:hover {
+  background: #1a3a5c;
+  color: #eee;
+}
+
+.signal-buttons button.active {
+  background: #0f3460;
+  color: #4fc3f7;
+  border-color: #4fc3f7;
+}
+
+.signal-buttons button[data-signal="humidity"].active {
+  color: #81c784;
+  border-color: #81c784;
+}
+
+.signal-buttons button[data-signal="temperature"].active {
+  color: #ffb74d;
+  border-color: #ffb74d;
+}
 
 .range-buttons {
   display: flex;
