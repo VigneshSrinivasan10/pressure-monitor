@@ -25,106 +25,144 @@ function saveLocation(loc) {
   localStorage.setItem("pressure-location", JSON.stringify(loc));
 }
 
-// --- Comfort score ---
+// --- Body Weather Index ---
 
-const COMFORT_LEVELS = [
-  { min: 80, label: "Good day",    cls: "comfort-green" },
-  { min: 60, label: "Moderate",    cls: "comfort-yellow" },
-  { min: 40, label: "Take it easy", cls: "comfort-orange" },
-  { min: 0,  label: "Flare risk",  cls: "comfort-red" },
+const BODY_WEATHER_LEVELS = [
+  { max: 2,  level: 1, label: "Calm",     color: "#4caf50" },
+  { max: 4,  level: 2, label: "Mild",     color: "#26c6da" },
+  { max: 6,  level: 3, label: "Moderate", color: "#fdd835" },
+  { max: 8,  level: 4, label: "High",     color: "#ff9800" },
+  { max: 10, level: 5, label: "Severe",   color: "#f44336" },
 ];
 
-function computeComfort(forecastSlice) {
-  if (!forecastSlice || forecastSlice.length < 3) return null;
-
-  let score = 100;
-
-  const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
+function computePressureFlux(slice) {
+  if (!slice || slice.length < 2) return 0;
+  const recent = slice.slice(0, Math.min(4, slice.length));
   const pMax = Math.max(...recent.map(d => d.pressure_hpa));
   const pMin = Math.min(...recent.map(d => d.pressure_hpa));
-  const pDrop3h = pMax - pMin;
-  if (pDrop3h > 3) score -= Math.min(40, Math.round((pDrop3h / 5) * 20));
+  const drop = pMax - pMin;
+  const rate = Math.abs(recent[recent.length - 1].pressure_hpa - recent[0].pressure_hpa) / (recent.length - 1);
+  const dropScore = Math.min(10, (drop / 6) * 10);
+  const rateScore = Math.min(10, (rate / 2) * 10);
+  return Math.min(10, Math.round(Math.max(dropScore, rateScore)));
+}
 
-  if (recent.length >= 2) {
-    const rate = Math.abs(recent[recent.length - 1].pressure_hpa - recent[0].pressure_hpa) / (recent.length - 1);
-    if (rate > 1) score -= 10;
-  }
+function computeDampCold(humidity, temp) {
+  if (humidity <= 60 || temp >= 20) return 0;
+  const rhFactor = Math.min(1, (humidity - 60) / 25);
+  const coldFactor = Math.min(1, (20 - temp) / 15);
+  return Math.min(10, Math.round(rhFactor * coldFactor * 10));
+}
 
-  const latest = forecastSlice[0];
-  const rh = latest.humidity_pct;
-  const temp = latest.temperature_c;
-  if (rh > 80 && temp < 8) score -= 15;
-  if (rh > 75 && temp > 28) score -= 10;
-
-  const window6h = forecastSlice.slice(0, Math.min(7, forecastSlice.length));
+function computeThermalShock(slice) {
+  if (!slice || slice.length < 2) return 0;
+  const window6h = slice.slice(0, Math.min(7, slice.length));
   const tMax = Math.max(...window6h.map(d => d.temperature_c));
   const tMin = Math.min(...window6h.map(d => d.temperature_c));
-  if (tMax - tMin > 8) score -= 15;
+  const swing = tMax - tMin;
+  if (swing <= 3) return 0;
+  return Math.min(10, Math.round(((swing - 3) / 9) * 10));
+}
 
-  return Math.max(0, Math.min(100, score));
+function computeBodyWeather(slice) {
+  if (!slice || slice.length === 0) return null;
+  const latest = slice[slice.length - 1];
+  const pFlux = computePressureFlux(slice);
+  const damp = computeDampCold(latest.humidity_pct, latest.temperature_c);
+  const thermal = computeThermalShock(slice);
+  const maxScore = Math.max(pFlux, damp, thermal);
+  const bwLevel = BODY_WEATHER_LEVELS.find(l => maxScore <= l.max);
+
+  const reasons = [
+    { score: pFlux, text: "Pressure shifting" },
+    { score: damp, text: "Cold & damp" },
+    { score: thermal, text: "Temperature swinging" },
+  ].filter(r => r.score > 0).sort((a, b) => b.score - a.score);
+  const reason = reasons.length > 0 ? reasons[0].text : "Conditions stable";
+
+  return {
+    level: bwLevel.level, label: bwLevel.label, color: bwLevel.color, reason,
+    sub: { pFlux, damp, thermal },
+  };
 }
 
 function enrichWithComfort(data) {
   for (let i = 0; i < data.length; i++) {
     const windowStart = Math.max(0, i - 6);
-    const window = data.slice(windowStart, i + 1);
-    data[i].comfort_score = computeComfort(window);
+    const w = data.slice(windowStart, i + 1);
+    const bw = computeBodyWeather(w);
+    data[i].comfort_score = bw ? (5 - bw.level + 1) * 20 : null;
+    data[i].body_weather = bw;
   }
   return data;
 }
 
-function updateComfortDisplay(score) {
-  const el = document.getElementById("comfort-score");
-  const labelEl = document.getElementById("comfort-label");
+function updateBodyWeatherDisplay(bw) {
   const card = document.getElementById("comfort-card");
+  const scoreEl = document.getElementById("bw-level");
+  const labelEl = document.getElementById("bw-label");
+  const reasonEl = document.getElementById("bw-reason");
+  const barsEl = document.getElementById("bw-bars");
 
-  card.className = "comfort-card";
-
-  if (score == null) {
-    el.textContent = "--";
+  if (!bw) {
+    scoreEl.textContent = "--";
     labelEl.textContent = "Loading...";
+    reasonEl.textContent = "";
+    card.style.borderColor = "#333";
+    scoreEl.style.color = "#eee";
+    labelEl.style.color = "#aaa";
     return;
   }
 
-  el.textContent = score;
-  const level = COMFORT_LEVELS.find(l => score >= l.min);
-  labelEl.textContent = level.label;
-  card.classList.add(level.cls);
+  scoreEl.textContent = bw.level;
+  scoreEl.style.color = bw.color;
+  labelEl.textContent = bw.label;
+  labelEl.style.color = bw.color;
+  reasonEl.textContent = bw.reason;
+  card.style.borderColor = bw.color;
+
+  const barColor = v => BODY_WEATHER_LEVELS.find(l => v <= l.max)?.color ?? "#333";
+  barsEl.innerHTML = [
+    { label: "Joint Pressure", value: bw.sub.pFlux },
+    { label: "Stiffness Risk", value: bw.sub.damp },
+    { label: "Muscle Tension", value: bw.sub.thermal },
+  ].map(b => `
+    <div class="bw-bar-row">
+      <span class="bw-bar-label">${b.label}</span>
+      <div class="bw-bar-track"><div class="bw-bar-fill" style="width:${b.value * 10}%;background:${barColor(b.value)}"></div></div>
+      <span class="bw-bar-value">${b.value}</span>
+    </div>
+  `).join("");
+}
+
+function initBodyWeatherCard() {
+  const card = document.getElementById("comfort-card");
+  card.addEventListener("click", () => card.classList.toggle("expanded"));
 }
 
 // --- Action cards ---
 
-function getActions(forecastSlice) {
-  if (!forecastSlice || forecastSlice.length === 0) return [];
+function getActions(bw) {
+  if (!bw) return [];
 
   const actions = [];
-  const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
-  const pMax = Math.max(...recent.map(d => d.pressure_hpa));
-  const pMin = Math.min(...recent.map(d => d.pressure_hpa));
-  const pDrop3h = recent.length >= 2 ? pMax - pMin : 0;
+  const { pFlux, damp, thermal } = bw.sub;
 
-  const latest = forecastSlice[0];
-  const rh = latest.humidity_pct;
-  const temp = latest.temperature_c;
-
-  const window6h = forecastSlice.slice(0, Math.min(7, forecastSlice.length));
-  const tMax = Math.max(...window6h.map(d => d.temperature_c));
-  const tMin = Math.min(...window6h.map(d => d.temperature_c));
-  const tempDrop6h = tMax - tMin;
-
-  if (pDrop3h > 5) {
+  if (pFlux >= 7) {
     actions.push({ icon: "\ud83d\udeb6", text: "10-min walk now \u2014 move before it stiffens", priority: "high" });
     actions.push({ icon: "\ud83e\uddd8", text: "Cat-cow stretches for spinal mobility", priority: "high" });
-  } else if (pDrop3h > 3) {
+  } else if (pFlux >= 4) {
     actions.push({ icon: "\ud83d\udeb6", text: "Light walk recommended", priority: "medium" });
   }
 
-  if (rh > 80 && temp < 8) {
+  if (damp >= 7) {
     actions.push({ icon: "\ud83d\udd25", text: "Heat pad on lower back", priority: "high" });
+    actions.push({ icon: "\ud83e\udde3", text: "Merino layer \u2014 keep lumbar warm", priority: "medium" });
+  } else if (damp >= 4) {
     actions.push({ icon: "\ud83e\udde3", text: "Merino layer \u2014 keep lumbar warm", priority: "medium" });
   }
 
-  if (tempDrop6h > 5) {
+  if (thermal >= 4) {
     actions.push({ icon: "\ud83e\uddd8", text: "Stretch first thing \u2014 muscles tightened overnight", priority: "medium" });
   }
 
@@ -191,9 +229,9 @@ async function loadCurrent() {
     document.getElementById("current-temp").textContent = (currentTemp != null ? `${currentTemp.toFixed(1)}°` : "--") + tTrend;
 
     const comfortWindow = hourly.slice(Math.max(0, nowIdx - 6), nowIdx + 1);
-    const score = computeComfort(comfortWindow);
-    updateComfortDisplay(score);
-    renderActionCards(getActions(comfortWindow));
+    const bw = computeBodyWeather(comfortWindow);
+    updateBodyWeatherDisplay(bw);
+    renderActionCards(getActions(bw));
     actionCardsLoaded = true;
   } catch {
     console.error("Failed to load current conditions");
@@ -299,7 +337,11 @@ async function loadForecast(hours) {
       let ni = 0, md = Infinity;
       forecastData.forEach((d, i) => { const diff = Math.abs(new Date(d.time).getTime() - now); if (diff < md) { md = diff; ni = i; } });
       const w = forecastData.slice(Math.max(0, ni - 6), ni + 1);
-      if (w.length) renderActionCards(getActions(w));
+      if (w.length) {
+        const bw = computeBodyWeather(w);
+        updateBodyWeatherDisplay(bw);
+        renderActionCards(getActions(bw));
+      }
     }
 
     renderForecastChart();
@@ -458,7 +500,8 @@ document.getElementById("range-buttons").addEventListener("click", e => {
 function reloadAll() {
   forecastData = [];
   historyData = [];
-  document.getElementById("location-name").innerHTML = "Comfort Index<br>" + currentLocation.name;
+  actionCardsLoaded = false;
+  document.getElementById("location-name").innerHTML = "Body Weather<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
   loadCurrent();
   loadForecast();
@@ -473,7 +516,7 @@ function initLocationUI() {
   const input = document.getElementById("location-input");
   const results = document.getElementById("location-results");
 
-  document.getElementById("location-name").innerHTML = "Comfort Index<br>" + currentLocation.name;
+  document.getElementById("location-name").innerHTML = "Body Weather<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
 
   editBtn.addEventListener("click", () => {
@@ -531,6 +574,7 @@ async function searchCity(query, resultsEl) {
 }
 
 initLocationUI();
+initBodyWeatherCard();
 loadCurrent();
 loadForecast();
 loadHistory("1w");

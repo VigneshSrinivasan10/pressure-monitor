@@ -12,7 +12,7 @@
 <body>
   <div class="container">
     <h1 id="location-header">
-      <span id="location-name">Comfort Index<br><span id="location-city">Berlin</span></span>
+      <span id="location-name">Body Weather<br><span id="location-city">Berlin</span></span>
       <span class="location-edit-icon" id="location-edit-btn" title="Change location">&#9998;</span>
     </h1>
     <div id="location-search" class="location-search hidden">
@@ -21,8 +21,12 @@
     </div>
 
     <div class="comfort-card" id="comfort-card">
-      <div class="comfort-score" id="comfort-score">--</div>
-      <div class="comfort-label" id="comfort-label">Loading...</div>
+      <div class="bw-summary">
+        <div class="bw-level" id="bw-level">--</div>
+        <div class="bw-label" id="bw-label">Loading...</div>
+        <div class="bw-reason" id="bw-reason"></div>
+      </div>
+      <div class="bw-detail" id="bw-bars"></div>
     </div>
 
     <div class="readings-row">

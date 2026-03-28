@@ -41,7 +41,7 @@ h2 {
 .reading.temperature { color: #ffb74d; }
 .reading-sep { color: #555; }
 
-/* Comfort card */
+/* Body Weather card */
 .comfort-card {
   background: #16213e;
   border-radius: 16px;
@@ -50,36 +50,80 @@ h2 {
   margin-bottom: 1rem;
   border: 2px solid #333;
   transition: border-color 0.3s;
+  cursor: pointer;
+  user-select: none;
 }
 
-.comfort-score {
+.bw-level {
   font-size: 3rem;
   font-weight: 800;
   line-height: 1;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
 }
 
-.comfort-label {
-  font-size: 0.9rem;
+.bw-label {
+  font-size: 0.95rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  font-weight: 600;
 }
 
-.comfort-green  { border-color: #4caf50; }
-.comfort-green .comfort-score { color: #4caf50; }
-.comfort-green .comfort-label { color: #81c784; }
+.bw-reason {
+  font-size: 0.8rem;
+  color: #999;
+  margin-top: 0.2rem;
+}
 
-.comfort-yellow { border-color: #fdd835; }
-.comfort-yellow .comfort-score { color: #fdd835; }
-.comfort-yellow .comfort-label { color: #fff176; }
+.bw-detail {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, margin-top 0.3s ease;
+  margin-top: 0;
+}
 
-.comfort-orange { border-color: #ff9800; }
-.comfort-orange .comfort-score { color: #ff9800; }
-.comfort-orange .comfort-label { color: #ffb74d; }
+.comfort-card.expanded .bw-detail {
+  max-height: 200px;
+  margin-top: 0.8rem;
+  border-top: 1px solid #333;
+  padding-top: 0.8rem;
+}
 
-.comfort-red    { border-color: #f44336; }
-.comfort-red .comfort-score { color: #f44336; }
-.comfort-red .comfort-label { color: #ef9a9a; }
+.bw-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.bw-bar-label {
+  font-size: 0.75rem;
+  color: #aaa;
+  width: 100px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.bw-bar-track {
+  flex: 1;
+  height: 6px;
+  background: #0d1b30;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bw-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.bw-bar-value {
+  font-size: 0.75rem;
+  color: #aaa;
+  width: 1.2rem;
+  text-align: right;
+  flex-shrink: 0;
+}
 
 /* Action cards */
 .action-card {
