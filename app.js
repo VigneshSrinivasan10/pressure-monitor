@@ -91,6 +91,56 @@ function updateComfortDisplay(score) {
   card.classList.add(level.cls);
 }
 
+// --- Action cards ---
+
+function getActions(forecastSlice) {
+  if (!forecastSlice || forecastSlice.length < 3) return [];
+
+  const actions = [];
+  const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
+  const pMax = Math.max(...recent.map(d => d.pressure_hpa));
+  const pMin = Math.min(...recent.map(d => d.pressure_hpa));
+  const pDrop3h = pMax - pMin;
+
+  const latest = forecastSlice[0];
+  const rh = latest.humidity_pct;
+  const temp = latest.temperature_c;
+
+  const window6h = forecastSlice.slice(0, Math.min(7, forecastSlice.length));
+  const tMax = Math.max(...window6h.map(d => d.temperature_c));
+  const tMin = Math.min(...window6h.map(d => d.temperature_c));
+  const tempDrop6h = tMax - tMin;
+
+  if (pDrop3h > 5) {
+    actions.push({ icon: "\ud83d\udeb6", text: "10-min walk now \u2014 move before it stiffens", priority: "high" });
+    actions.push({ icon: "\ud83e\uddd8", text: "Cat-cow stretches for spinal mobility", priority: "high" });
+  } else if (pDrop3h > 3) {
+    actions.push({ icon: "\ud83d\udeb6", text: "Light walk recommended", priority: "medium" });
+  }
+
+  if (rh > 80 && temp < 8) {
+    actions.push({ icon: "\ud83d\udd25", text: "Heat pad on lower back", priority: "high" });
+    actions.push({ icon: "\ud83e\udde3", text: "Merino layer \u2014 keep lumbar warm", priority: "medium" });
+  }
+
+  if (tempDrop6h > 5) {
+    actions.push({ icon: "\ud83e\uddd8", text: "Stretch first thing \u2014 muscles tightened overnight", priority: "medium" });
+  }
+
+  if (actions.length === 0) {
+    actions.push({ icon: "\ud83c\udfc3", text: "Good day \u2014 your body will thank you for moving", priority: "low" });
+  }
+
+  return actions;
+}
+
+function renderActionCards(actions) {
+  const container = document.getElementById("action-cards");
+  container.innerHTML = actions.map(a =>
+    `<div class="action-card action-${a.priority}"><span class="action-icon">${a.icon}</span><span class="action-text">${a.text}</span></div>`
+  ).join("");
+}
+
 // --- Current conditions ---
 
 async function loadCurrent() {
@@ -142,6 +192,7 @@ async function loadCurrent() {
     const comfortWindow = hourly.slice(Math.max(0, nowIdx - 6), nowIdx + 1);
     const score = computeComfort(comfortWindow);
     updateComfortDisplay(score);
+    renderActionCards(getActions(comfortWindow));
   } catch {
     console.error("Failed to load current conditions");
   }
