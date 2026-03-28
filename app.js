@@ -10,6 +10,7 @@ let activeRange = "1w";
 let forecastChart;
 let forecastData = [];
 let activeForecastHours = 24;
+let actionCardsLoaded = false;
 
 function loadLocation() {
   try {
@@ -94,13 +95,13 @@ function updateComfortDisplay(score) {
 // --- Action cards ---
 
 function getActions(forecastSlice) {
-  if (!forecastSlice || forecastSlice.length < 3) return [];
+  if (!forecastSlice || forecastSlice.length === 0) return [];
 
   const actions = [];
   const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
   const pMax = Math.max(...recent.map(d => d.pressure_hpa));
   const pMin = Math.min(...recent.map(d => d.pressure_hpa));
-  const pDrop3h = pMax - pMin;
+  const pDrop3h = recent.length >= 2 ? pMax - pMin : 0;
 
   const latest = forecastSlice[0];
   const rh = latest.humidity_pct;
@@ -193,6 +194,7 @@ async function loadCurrent() {
     const score = computeComfort(comfortWindow);
     updateComfortDisplay(score);
     renderActionCards(getActions(comfortWindow));
+    actionCardsLoaded = true;
   } catch {
     console.error("Failed to load current conditions");
   }
@@ -290,6 +292,14 @@ async function loadForecast(hours) {
         humidity_pct: humidities[i],
         temperature_c: temps[i],
       })).filter(d => d.pressure_hpa != null));
+    }
+
+    if (!actionCardsLoaded) {
+      const now = Date.now();
+      let ni = 0, md = Infinity;
+      forecastData.forEach((d, i) => { const diff = Math.abs(new Date(d.time).getTime() - now); if (diff < md) { md = diff; ni = i; } });
+      const w = forecastData.slice(Math.max(0, ni - 6), ni + 1);
+      if (w.length) renderActionCards(getActions(w));
     }
 
     renderForecastChart();
