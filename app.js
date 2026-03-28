@@ -170,7 +170,7 @@ function makeMultiLineDatasets(data) {
       tension: 0.3,
       pointRadius: 0,
       borderWidth: 1.5,
-      yAxisID: "yRight",
+      yAxisID: "yTemp",
     },
   ];
 }
@@ -193,8 +193,15 @@ function dualAxisScales(xCallback) {
     yRight: {
       type: "linear",
       position: "right",
-      ticks: { color: "#888" },
-      title: { display: true, text: "% / °C", color: "#888" },
+      ticks: { color: "#81c784" },
+      title: { display: true, text: "%", color: "#81c784" },
+      grid: { drawOnChartArea: false },
+    },
+    yTemp: {
+      type: "linear",
+      position: "right",
+      ticks: { color: "#ffb74d" },
+      title: { display: true, text: "°C", color: "#ffb74d" },
       grid: { drawOnChartArea: false },
     },
   };
