@@ -188,20 +188,17 @@ function dualAxisScales(xCallback) {
       type: "linear",
       position: "left",
       ticks: { color: "#4fc3f7" },
-      title: { display: true, text: "hPa", color: "#4fc3f7" },
     },
     yRight: {
       type: "linear",
       position: "right",
       ticks: { color: "#81c784" },
-      title: { display: true, text: "%", color: "#81c784" },
       grid: { drawOnChartArea: false },
     },
     yTemp: {
       type: "linear",
       position: "right",
       ticks: { color: "#ffb74d" },
-      title: { display: true, text: "°C", color: "#ffb74d" },
       grid: { drawOnChartArea: false },
     },
   };
