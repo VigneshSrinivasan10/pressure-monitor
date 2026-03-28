@@ -2,13 +2,13 @@ const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
 const ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive";
 const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const RANGE_DAYS = { "1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365 };
-const TREND_ICONS = { rising: "\u2197\ufe0f Rising", falling: "\u2198\ufe0f Falling", stable: "\u2194\ufe0f Stable" };
 const DEFAULT_LOCATION = { name: "Berlin", lat: 52.52, lon: 13.41 };
 
 const SIGNALS = {
   pressure:    { key: "pressure_hpa",    label: "Pressure",    unit: "hPa",  color: "#4fc3f7" },
   humidity:    { key: "humidity_pct",     label: "Humidity",    unit: "%",    color: "#81c784" },
   temperature: { key: "temperature_c",   label: "Temperature", unit: "°C",   color: "#ffb74d" },
+  comfort:     { key: "comfort_score",   label: "Comfort",     unit: "/100", color: "#4caf50" },
 };
 
 let currentLocation = loadLocation();
@@ -46,9 +46,84 @@ function setActiveSignal(signal) {
 
 // --- Current conditions ---
 
+// --- Comfort score ---
+
+const COMFORT_LEVELS = [
+  { min: 80, label: "Good day",    cls: "comfort-green" },
+  { min: 60, label: "Moderate",    cls: "comfort-yellow" },
+  { min: 40, label: "Take it easy", cls: "comfort-orange" },
+  { min: 0,  label: "Flare risk",  cls: "comfort-red" },
+];
+
+function computeComfort(forecastSlice) {
+  // Need at least 6 hours of data for meaningful scoring
+  if (!forecastSlice || forecastSlice.length < 3) return null;
+
+  let score = 100;
+
+  // Pressure drop penalty: look at 3h window around now
+  const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
+  const pMax = Math.max(...recent.map(d => d.pressure_hpa));
+  const pMin = Math.min(...recent.map(d => d.pressure_hpa));
+  const pDrop3h = pMax - pMin;
+  if (pDrop3h > 3) score -= Math.min(40, Math.round((pDrop3h / 5) * 20));
+
+  // Pressure drop rate: > 1 hPa/h sustained over recent hours
+  if (recent.length >= 2) {
+    const rate = Math.abs(recent[recent.length - 1].pressure_hpa - recent[0].pressure_hpa) / (recent.length - 1);
+    if (rate > 1) score -= 10;
+  }
+
+  // Humidity + temperature combos (use latest values)
+  const latest = forecastSlice[0];
+  const rh = latest.humidity_pct;
+  const temp = latest.temperature_c;
+  if (rh > 80 && temp < 8) score -= 15;
+  if (rh > 75 && temp > 28) score -= 10;
+
+  // Temperature swing: look at 6h window
+  const window6h = forecastSlice.slice(0, Math.min(7, forecastSlice.length));
+  const tMax = Math.max(...window6h.map(d => d.temperature_c));
+  const tMin = Math.min(...window6h.map(d => d.temperature_c));
+  if (tMax - tMin > 8) score -= 15;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+function enrichWithComfort(data) {
+  for (let i = 0; i < data.length; i++) {
+    const windowStart = Math.max(0, i - 6);
+    const window = data.slice(windowStart, i + 1);
+    data[i].comfort_score = computeComfort(window);
+  }
+  return data;
+}
+
+function updateComfortDisplay(score) {
+  const el = document.getElementById("comfort-score");
+  const labelEl = document.getElementById("comfort-label");
+  const card = document.getElementById("comfort-card");
+
+  // Remove old classes
+  card.className = "comfort-card";
+
+  if (score == null) {
+    el.textContent = "--";
+    labelEl.textContent = "Loading...";
+    return;
+  }
+
+  el.textContent = score;
+  const level = COMFORT_LEVELS.find(l => score >= l.min);
+  labelEl.textContent = level.label;
+  card.classList.add(level.cls);
+}
+
+// --- Current conditions ---
+
 async function loadCurrent() {
   try {
-    const url = `${FORECAST_URL}?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current=surface_pressure,relative_humidity_2m,temperature_2m&daily=surface_pressure_mean,temperature_2m_mean&forecast_days=2&timezone=auto`;
+    const url = `${FORECAST_URL}?latitude=${currentLocation.lat}&longitude=${currentLocation.lon}&current=surface_pressure,relative_humidity_2m,temperature_2m&hourly=surface_pressure,relative_humidity_2m,temperature_2m&forecast_days=1&timezone=auto`;
     const r = await fetch(url);
     const data = await r.json();
 
@@ -56,21 +131,35 @@ async function loadCurrent() {
     const currentHumidity = data.current.relative_humidity_2m;
     const currentTemp = data.current.temperature_2m;
 
-    const means = data.daily?.surface_pressure_mean ?? [];
-    const todayMean = means[0] ?? null;
-    const tomorrowMean = means[1] ?? null;
-
-    let trend = null;
-    if (todayMean != null && tomorrowMean != null) {
-      const diff = tomorrowMean - todayMean;
-      trend = diff > 1 ? "rising" : diff < -1 ? "falling" : "stable";
-    }
-
     document.getElementById("current").textContent = current?.toFixed(1) ?? "--";
     document.getElementById("current-humidity").textContent = currentHumidity != null ? `${currentHumidity}%` : "--";
     document.getElementById("current-temp").textContent = currentTemp != null ? `${currentTemp.toFixed(1)}°` : "--";
-    document.getElementById("tomorrow").textContent = tomorrowMean?.toFixed(1) ?? "--";
-    document.getElementById("trend").textContent = TREND_ICONS[trend] ?? "--";
+
+    // Compute comfort from today's hourly data
+    const times = data.hourly?.time ?? [];
+    const pressures = data.hourly?.surface_pressure ?? [];
+    const humidities = data.hourly?.relative_humidity_2m ?? [];
+    const temps = data.hourly?.temperature_2m ?? [];
+
+    const now = Date.now();
+    const hourly = times.map((t, i) => ({
+      time: t,
+      pressure_hpa: pressures[i],
+      humidity_pct: humidities[i],
+      temperature_c: temps[i],
+    })).filter(d => d.pressure_hpa != null);
+
+    // Find closest index to now, take a window around it
+    let nowIdx = 0;
+    let minDiff = Infinity;
+    hourly.forEach((d, i) => {
+      const diff = Math.abs(new Date(d.time).getTime() - now);
+      if (diff < minDiff) { minDiff = diff; nowIdx = i; }
+    });
+
+    const comfortWindow = hourly.slice(Math.max(0, nowIdx - 6), nowIdx + 1);
+    const score = computeComfort(comfortWindow);
+    updateComfortDisplay(score);
   } catch {
     console.error("Failed to load current conditions");
   }
@@ -93,12 +182,12 @@ async function loadForecast(hours) {
       const pressures = data.hourly?.surface_pressure ?? [];
       const humidities = data.hourly?.relative_humidity_2m ?? [];
       const temps = data.hourly?.temperature_2m ?? [];
-      forecastData = times.map((t, i) => ({
+      forecastData = enrichWithComfort(times.map((t, i) => ({
         time: t,
         pressure_hpa: pressures[i],
         humidity_pct: humidities[i],
         temperature_c: temps[i],
-      })).filter(d => d.pressure_hpa != null);
+      })).filter(d => d.pressure_hpa != null));
     }
 
     renderForecastChart();
@@ -220,12 +309,12 @@ async function loadHistory(range) {
     const pressures = data.hourly?.surface_pressure ?? [];
     const humidities = data.hourly?.relative_humidity_2m ?? [];
     const temps = data.hourly?.temperature_2m ?? [];
-    historyData = times.map((t, i) => ({
+    historyData = enrichWithComfort(times.map((t, i) => ({
       time: t,
       pressure_hpa: pressures[i],
       humidity_pct: humidities[i],
       temperature_c: temps[i],
-    })).filter(d => d.pressure_hpa != null);
+    })).filter(d => d.pressure_hpa != null));
 
     renderHistoryChart();
   } catch {
@@ -302,7 +391,7 @@ document.getElementById("signal-buttons").addEventListener("click", e => {
 function reloadAll() {
   forecastData = [];
   historyData = [];
-  document.getElementById("location-name").innerHTML = "Air pressure<br>" + currentLocation.name;
+  document.getElementById("location-name").innerHTML = "Comfort Index<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
   loadCurrent();
   loadForecast();
@@ -317,7 +406,7 @@ function initLocationUI() {
   const input = document.getElementById("location-input");
   const results = document.getElementById("location-results");
 
-  document.getElementById("location-name").innerHTML = "Air pressure<br>" + currentLocation.name;
+  document.getElementById("location-name").innerHTML = "Comfort Index<br>" + currentLocation.name;
   document.title = `${currentLocation.name} Pressure Monitor`;
 
   editBtn.addEventListener("click", () => {

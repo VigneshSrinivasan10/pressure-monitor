@@ -12,12 +12,17 @@
 <body>
   <div class="container">
     <h1 id="location-header">
-      <span id="location-name">Air pressure<br><span id="location-city">Berlin</span></span>
+      <span id="location-name">Comfort Index<br><span id="location-city">Berlin</span></span>
       <span class="location-edit-icon" id="location-edit-btn" title="Change location">&#9998;</span>
     </h1>
     <div id="location-search" class="location-search hidden">
       <input type="text" id="location-input" placeholder="Search city..." autocomplete="off">
       <ul id="location-results"></ul>
+    </div>
+
+    <div class="comfort-card" id="comfort-card">
+      <div class="comfort-score" id="comfort-score">--</div>
+      <div class="comfort-label" id="comfort-label">Loading...</div>
     </div>
 
     <div class="cards">
@@ -34,21 +39,13 @@
         <div class="label">Temperature</div>
         <div class="value" id="current-temp">--</div>
       </div>
-      <div class="card forecast-card">
-        <div class="label">Tomorrow</div>
-        <div class="value" id="tomorrow">--</div>
-        <div class="unit">hPa</div>
-      </div>
-      <div class="card trend">
-        <div class="label">Trend</div>
-        <div class="value" id="trend">--</div>
-      </div>
     </div>
 
     <div class="signal-buttons" id="signal-buttons">
       <button data-signal="pressure" class="active">Pressure</button>
       <button data-signal="humidity">Humidity</button>
       <button data-signal="temperature">Temperature</button>
+      <button data-signal="comfort">Comfort</button>
     </div>
 
     <h2>Forecast</h2>
