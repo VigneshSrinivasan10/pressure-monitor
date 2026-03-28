@@ -25,27 +25,12 @@
       <div class="comfort-label" id="comfort-label">Loading...</div>
     </div>
 
-    <div class="cards">
-      <div class="card current">
-        <div class="label">Pressure</div>
-        <div class="value" id="current">--</div>
-        <div class="unit">hPa</div>
-      </div>
-      <div class="card humidity">
-        <div class="label">Humidity</div>
-        <div class="value" id="current-humidity">--</div>
-      </div>
-      <div class="card temperature">
-        <div class="label">Temperature</div>
-        <div class="value" id="current-temp">--</div>
-      </div>
-    </div>
-
-    <div class="signal-buttons" id="signal-buttons">
-      <button data-signal="pressure" class="active">Pressure</button>
-      <button data-signal="humidity">Humidity</button>
-      <button data-signal="temperature">Temperature</button>
-      <button data-signal="comfort">Comfort</button>
+    <div class="readings-row">
+      <span class="reading pressure"><span id="current">--</span> hPa</span>
+      <span class="reading-sep">&middot;</span>
+      <span class="reading humidity"><span id="current-humidity">--</span></span>
+      <span class="reading-sep">&middot;</span>
+      <span class="reading temperature"><span id="current-temp">--</span></span>
     </div>
 
     <h2>Forecast</h2>

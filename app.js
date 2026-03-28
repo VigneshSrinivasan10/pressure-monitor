@@ -4,20 +4,12 @@ const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const RANGE_DAYS = { "1w": 7, "1m": 30, "3m": 90, "6m": 180, "1y": 365 };
 const DEFAULT_LOCATION = { name: "Berlin", lat: 52.52, lon: 13.41 };
 
-const SIGNALS = {
-  pressure:    { key: "pressure_hpa",    label: "Pressure",    unit: "hPa",  color: "#4fc3f7" },
-  humidity:    { key: "humidity_pct",     label: "Humidity",    unit: "%",    color: "#81c784" },
-  temperature: { key: "temperature_c",   label: "Temperature", unit: "°C",   color: "#ffb74d" },
-  comfort:     { key: "comfort_score",   label: "Comfort",     unit: "/100", color: "#4caf50" },
-};
-
 let currentLocation = loadLocation();
 let chart;
 let activeRange = "1w";
 let forecastChart;
 let forecastData = [];
 let activeForecastHours = 24;
-let activeSignal = "pressure";
 
 function loadLocation() {
   try {
@@ -32,20 +24,6 @@ function saveLocation(loc) {
   localStorage.setItem("pressure-location", JSON.stringify(loc));
 }
 
-function sig() { return SIGNALS[activeSignal]; }
-
-function setActiveSignal(signal) {
-  activeSignal = signal;
-  document.querySelectorAll("#signal-buttons button").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.signal === activeSignal);
-  });
-  // Re-render charts with new signal (no re-fetch needed)
-  renderForecastChart();
-  renderHistoryChart();
-}
-
-// --- Current conditions ---
-
 // --- Comfort score ---
 
 const COMFORT_LEVELS = [
@@ -56,32 +34,27 @@ const COMFORT_LEVELS = [
 ];
 
 function computeComfort(forecastSlice) {
-  // Need at least 6 hours of data for meaningful scoring
   if (!forecastSlice || forecastSlice.length < 3) return null;
 
   let score = 100;
 
-  // Pressure drop penalty: look at 3h window around now
   const recent = forecastSlice.slice(0, Math.min(4, forecastSlice.length));
   const pMax = Math.max(...recent.map(d => d.pressure_hpa));
   const pMin = Math.min(...recent.map(d => d.pressure_hpa));
   const pDrop3h = pMax - pMin;
   if (pDrop3h > 3) score -= Math.min(40, Math.round((pDrop3h / 5) * 20));
 
-  // Pressure drop rate: > 1 hPa/h sustained over recent hours
   if (recent.length >= 2) {
     const rate = Math.abs(recent[recent.length - 1].pressure_hpa - recent[0].pressure_hpa) / (recent.length - 1);
     if (rate > 1) score -= 10;
   }
 
-  // Humidity + temperature combos (use latest values)
   const latest = forecastSlice[0];
   const rh = latest.humidity_pct;
   const temp = latest.temperature_c;
   if (rh > 80 && temp < 8) score -= 15;
   if (rh > 75 && temp > 28) score -= 10;
 
-  // Temperature swing: look at 6h window
   const window6h = forecastSlice.slice(0, Math.min(7, forecastSlice.length));
   const tMax = Math.max(...window6h.map(d => d.temperature_c));
   const tMin = Math.min(...window6h.map(d => d.temperature_c));
@@ -104,7 +77,6 @@ function updateComfortDisplay(score) {
   const labelEl = document.getElementById("comfort-label");
   const card = document.getElementById("comfort-card");
 
-  // Remove old classes
   card.className = "comfort-card";
 
   if (score == null) {
@@ -135,7 +107,6 @@ async function loadCurrent() {
     document.getElementById("current-humidity").textContent = currentHumidity != null ? `${currentHumidity}%` : "--";
     document.getElementById("current-temp").textContent = currentTemp != null ? `${currentTemp.toFixed(1)}°` : "--";
 
-    // Compute comfort from today's hourly data
     const times = data.hourly?.time ?? [];
     const pressures = data.hourly?.surface_pressure ?? [];
     const humidities = data.hourly?.relative_humidity_2m ?? [];
@@ -149,7 +120,6 @@ async function loadCurrent() {
       temperature_c: temps[i],
     })).filter(d => d.pressure_hpa != null);
 
-    // Find closest index to now, take a window around it
     let nowIdx = 0;
     let minDiff = Infinity;
     hourly.forEach((d, i) => {
@@ -163,6 +133,71 @@ async function loadCurrent() {
   } catch {
     console.error("Failed to load current conditions");
   }
+}
+
+// --- Multi-line chart helpers ---
+
+function makeMultiLineDatasets(data) {
+  return [
+    {
+      label: "Pressure (hPa)",
+      data: data.map(r => r.pressure_hpa),
+      borderColor: "#4fc3f7",
+      backgroundColor: "transparent",
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 1.5,
+      yAxisID: "yLeft",
+    },
+    {
+      label: "Humidity (%)",
+      data: data.map(r => r.humidity_pct),
+      borderColor: "#81c784",
+      backgroundColor: "transparent",
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 1.5,
+      yAxisID: "yRight",
+    },
+    {
+      label: "Temperature (°C)",
+      data: data.map(r => r.temperature_c),
+      borderColor: "#ffb74d",
+      backgroundColor: "transparent",
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      borderWidth: 1.5,
+      yAxisID: "yRight",
+    },
+  ];
+}
+
+function dualAxisScales(xCallback) {
+  return {
+    x: {
+      ticks: {
+        color: "#888",
+        maxTicksLimit: 8,
+        callback: xCallback,
+      },
+    },
+    yLeft: {
+      type: "linear",
+      position: "left",
+      ticks: { color: "#4fc3f7" },
+      title: { display: true, text: "hPa", color: "#4fc3f7" },
+    },
+    yRight: {
+      type: "linear",
+      position: "right",
+      ticks: { color: "#888" },
+      title: { display: true, text: "% / °C", color: "#888" },
+      grid: { drawOnChartArea: false },
+    },
+  };
 }
 
 // --- Forecast ---
@@ -197,12 +232,11 @@ async function loadForecast(hours) {
 }
 
 function renderForecastChart() {
-  const s = sig();
   const sliced = forecastData.slice(0, activeForecastHours);
   if (!sliced.length) return;
 
   const labels = sliced.map(r => r.time);
-  const values = sliced.map(r => r[s.key]);
+  const datasets = makeMultiLineDatasets(sliced);
 
   const now = Date.now();
   let nowIndex = 0;
@@ -211,10 +245,6 @@ function renderForecastChart() {
     const diff = Math.abs(new Date(d.time).getTime() - now);
     if (diff < minDiff) { minDiff = diff; nowIndex = i; }
   });
-
-  const pointRadii = values.map((_, i) => i === nowIndex ? 5 : 0);
-  const pointColors = values.map((_, i) => i === nowIndex ? "#fff" : "transparent");
-  const pointBorders = values.map((_, i) => i === nowIndex ? s.color : "transparent");
 
   const nowLinePlugin = {
     id: "nowLine",
@@ -243,41 +273,22 @@ function renderForecastChart() {
   if (forecastChart) forecastChart.destroy();
   forecastChart = new Chart(document.getElementById("forecast-chart"), {
     type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: `${s.label} (${s.unit})`,
-        data: values,
-        borderColor: s.color,
-        backgroundColor: hexToRgba(s.color, 0.1),
-        fill: true,
-        tension: 0.3,
-        pointRadius: pointRadii,
-        pointBackgroundColor: pointColors,
-        pointBorderColor: pointBorders,
-        pointBorderWidth: 2,
-        borderWidth: 1.5,
-      }],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
       layout: { padding: { top: 16 } },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: {
-            color: "#888",
-            maxTicksLimit: 8,
-            callback(val) {
-              const label = this.getLabelForValue(val);
-              if (!label) return "";
-              const [date, time] = label.split("T");
-              return activeForecastHours <= 24 ? time : date;
-            },
-          },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#ccc", boxWidth: 12, font: { size: 11 } },
         },
-        y: { ticks: { color: "#888" } },
       },
+      scales: dualAxisScales(function (val) {
+        const label = this.getLabelForValue(val);
+        if (!label) return "";
+        const [date, time] = label.split("T");
+        return activeForecastHours <= 24 ? time : date;
+      }),
     },
     plugins: [nowLinePlugin],
   });
@@ -323,44 +334,27 @@ async function loadHistory(range) {
 }
 
 function renderHistoryChart() {
-  const s = sig();
   if (!historyData.length) return;
 
   const labels = historyData.map(r => r.time);
-  const values = historyData.map(r => r[s.key]);
+  const datasets = makeMultiLineDatasets(historyData);
 
   if (chart) chart.destroy();
   chart = new Chart(document.getElementById("chart"), {
     type: "line",
-    data: {
-      labels,
-      datasets: [{
-        label: `${s.label} (${s.unit})`,
-        data: values,
-        borderColor: s.color,
-        backgroundColor: hexToRgba(s.color, 0.1),
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        borderWidth: 1.5,
-      }],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: {
-          ticks: {
-            color: "#888",
-            maxTicksLimit: 8,
-            callback(val) {
-              const label = this.getLabelForValue(val);
-              return label ? label.split("T")[0] : "";
-            },
-          },
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: "#ccc", boxWidth: 12, font: { size: 11 } },
         },
-        y: { ticks: { color: "#888" } },
       },
+      scales: dualAxisScales(function (val) {
+        const label = this.getLabelForValue(val);
+        return label ? label.split("T")[0] : "";
+      }),
     },
   });
 }
@@ -382,10 +376,6 @@ document.getElementById("forecast-buttons").addEventListener("click", e => {
 
 document.getElementById("range-buttons").addEventListener("click", e => {
   if (e.target.dataset.range) loadHistory(e.target.dataset.range);
-});
-
-document.getElementById("signal-buttons").addEventListener("click", e => {
-  if (e.target.dataset.signal) setActiveSignal(e.target.dataset.signal);
 });
 
 function reloadAll() {
