@@ -103,10 +103,6 @@ async function loadCurrent() {
     const currentHumidity = data.current.relative_humidity_2m;
     const currentTemp = data.current.temperature_2m;
 
-    document.getElementById("current").textContent = current?.toFixed(1) ?? "--";
-    document.getElementById("current-humidity").textContent = currentHumidity != null ? `${currentHumidity}%` : "--";
-    document.getElementById("current-temp").textContent = currentTemp != null ? `${currentTemp.toFixed(1)}°` : "--";
-
     const times = data.hourly?.time ?? [];
     const pressures = data.hourly?.surface_pressure ?? [];
     const humidities = data.hourly?.relative_humidity_2m ?? [];
@@ -126,6 +122,22 @@ async function loadCurrent() {
       const diff = Math.abs(new Date(d.time).getTime() - now);
       if (diff < minDiff) { minDiff = diff; nowIdx = i; }
     });
+
+    // Trend arrows: compare now vs 3 hours ahead
+    const futureIdx = Math.min(nowIdx + 3, hourly.length - 1);
+    const trend = (nowVal, futureVal) => {
+      const diff = futureVal - nowVal;
+      if (Math.abs(diff) < 0.3) return "";
+      return diff > 0 ? " \u2197" : " \u2198";
+    };
+
+    const pTrend = futureIdx > nowIdx ? trend(hourly[nowIdx].pressure_hpa, hourly[futureIdx].pressure_hpa) : "";
+    const hTrend = futureIdx > nowIdx ? trend(hourly[nowIdx].humidity_pct, hourly[futureIdx].humidity_pct) : "";
+    const tTrend = futureIdx > nowIdx ? trend(hourly[nowIdx].temperature_c, hourly[futureIdx].temperature_c) : "";
+
+    document.getElementById("current").textContent = (current?.toFixed(1) ?? "--") + pTrend;
+    document.getElementById("current-humidity").textContent = (currentHumidity != null ? `${currentHumidity}%` : "--") + hTrend;
+    document.getElementById("current-temp").textContent = (currentTemp != null ? `${currentTemp.toFixed(1)}°` : "--") + tTrend;
 
     const comfortWindow = hourly.slice(Math.max(0, nowIdx - 6), nowIdx + 1);
     const score = computeComfort(comfortWindow);
